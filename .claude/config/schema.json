@@ -1,0 +1,98 @@
+{
+  "version": "1.0.0",
+  "description": "Claude Code Memory System Schema",
+  "memory_files": {
+    "learned_skills": {
+      "file": "memory/learned-skills.md",
+      "type": "markdown",
+      "purpose": "Index of all discovered skills",
+      "structure": {
+        "header": "# Learned Skills",
+        "entry": "## [Skill Name]\n- **Path**: .claude/skills/[skill-name]\n- **Description**: [description]\n- **When to Use**: [use cases]\n- **Key Features**: [features list]\n- **Last Updated**: [timestamp]"
+      },
+      "update_trigger": "On startup or skill discovery"
+    },
+    "session_history": {
+      "file": "memory/session-history.md",
+      "type": "markdown",
+      "purpose": "Record of completed tasks and decisions",
+      "structure": {
+        "header": "# Session History",
+        "entry": "## [Task Name] - [Timestamp]\n- **Status**: ✅ Completed\n- **What Was Done**: [description]\n- **Decisions Made**: [list]\n- **Outcomes**: [results]\n- **Related Files**: [file links]"
+      },
+      "update_trigger": "On task completion"
+    },
+    "context_cache": {
+      "file": "memory/context-cache.md",
+      "type": "markdown",
+      "purpose": "Quick context recovery for current work",
+      "structure": {
+        "header": "# Context Cache",
+        "sections": [
+          "## Current Project State",
+          "## Important Variables",
+          "## Recently Edited Files",
+          "## Current Directory",
+          "## Key Paths",
+          "## Active Dependencies"
+        ]
+      },
+      "update_trigger": "On project state change"
+    },
+    "task_status": {
+      "file": "memory/task-status.md",
+      "type": "markdown",
+      "purpose": "Track ongoing and pending tasks",
+      "structure": {
+        "header": "# Task Status",
+        "entry": "## [Task ID] - [Task Name]\n- **Status**: [not-started|in-progress|completed]\n- **Priority**: [high|medium|low]\n- **Due**: [date or 'ongoing']\n- **Progress**: [percentage]\n- **Next Steps**: [list]\n- **Blockers**: [if any]\n- **Owner**: Claude Code"
+      },
+      "update_trigger": "Real-time as tasks progress"
+    },
+    "discoveries": {
+      "file": "memory/discoveries.md",
+      "type": "markdown",
+      "purpose": "Record useful findings and insights",
+      "structure": {
+        "header": "# Discoveries & Insights",
+        "entry": "## [Discovery Title]\n- **Category**: [performance|pattern|bug-fix|optimization]\n- **Problem**: [what was the issue]\n- **Solution**: [what worked]\n- **Code Example**: [if applicable]\n- **Applicability**: [when to use]\n- **Date Discovered**: [timestamp]"
+      },
+      "update_trigger": "Immediately upon discovery"
+    }
+  },
+  "skill_format": {
+    "file_pattern": ".claude/skills/[skill-name]/SKILL.md",
+    "required_sections": [
+      "Metadata (name, description)",
+      "When to Use This Skill",
+      "Key Commands or Methods",
+      "How to Help Users"
+    ],
+    "parsing_rules": {
+      "extract_name": "frontmatter.name or first heading",
+      "extract_description": "frontmatter.description or first paragraph",
+      "extract_use_cases": "When to Use section",
+      "extract_key_features": "Key Commands section or similar"
+    }
+  },
+  "initialization_sequence": [
+    "Check if .claude/memory/ exists, create if not",
+    "Scan .claude/skills/ for all subdirectories",
+    "Parse each SKILL.md file",
+    "Update learned-skills.md with new/updated skills",
+    "Read context-cache.md and restore last state",
+    "Read task-status.md and display pending tasks",
+    "Ready to accept user commands"
+  ],
+  "memory_persistence": {
+    "auto_save": true,
+    "save_interval_ms": 5000,
+    "backup_on_startup": true,
+    "retention_policy": {
+      "session_history": "All sessions",
+      "context_cache": "Overwrite current",
+      "task_status": "Until marked completed",
+      "discoveries": "All discoveries"
+    }
+  }
+}

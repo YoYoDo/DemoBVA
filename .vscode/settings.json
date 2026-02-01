@@ -1,0 +1,174 @@
+# VS Code 設置建議
+
+## VS Code Settings (settings.json)
+
+在 VS Code 中打開設置（Cmd/Ctrl + ,），添加以下配置：
+
+```json
+{
+  // Claude Code 記憶系統設置
+  "claude.memory.enabled": true,
+  "claude.memory.path": ".claude/memory",
+  "claude.memory.autoSave": true,
+  "claude.memory.savePath": ".claude/memory",
+  "claude.memory.autoload": true,
+
+  // 技能系統設置
+  "claude.skills.enabled": true,
+  "claude.skills.path": ".claude/skills",
+  "claude.skills.loadOnStartup": true,
+  "claude.skills.scanPath": ".claude/skills",
+
+  // 工作流系統設置
+  "claude.workflows.enabled": true,
+  "claude.workflows.path": ".claude/workflows",
+  "claude.workflows.autoload": true,
+  "claude.workflows.validateOnLoad": true,
+  "claude.workflows.showProgress": true,
+  "claude.workflows.autoSave": true,
+
+  // 初始化設置
+  "claude.startup.autoInit": true,
+  "claude.startup.scanSkills": true,
+  "claude.startup.loadWorkflows": true,
+  "claude.startup.restoreContext": true,
+  "claude.startup.checkTasks": true,
+  "claude.startup.verbose": false,
+
+  // 環境設置
+  "claude.env.loadFromDotEnv": true,
+  "claude.env.path": ".env",
+
+  // 調試和日誌
+  "claude.debug": false,
+  "claude.logLevel": "info",
+  "claude.verbose": false,
+
+  // 文件監視
+  "files.exclude": {
+    ".claude/config/startup.js.bak": true
+  },
+  "files.watcherExclude": {
+    ".claude/memory/.cache": true
+  }
+}
+```
+
+## 使用 .vscode/settings.json（工作區特定設置）
+
+在項目根目錄創建 `.vscode/settings.json`（推薦方式）：
+
+```bash
+mkdir -p .vscode
+```
+
+然後在 `.vscode/settings.json` 中添加上述設置，這樣只會影響此項目。
+
+## 推薦的 VS Code 擴展
+
+為了最好的體驗，建議安裝以下擴展：
+
+1. **Markdown Preview Enhanced** - 更好地預覽 markdown 檔案
+2. **JSON Editor** - JSON 檔案編輯和驗證
+3. **.env** - .env 檔案高亮
+4. **Better Comments** - 改進的註解高亮
+5. **Error Lens** - 行內錯誤顯示
+
+## 快捷鍵配置建議
+
+在 VS Code 快捷鍵設置中添加（Cmd/Ctrl + K, Cmd/Ctrl + S）：
+
+```json
+[
+  {
+    "key": "cmd+shift+i",
+    "command": "workbench.action.terminal.sendSequence",
+    "args": {
+      "text": "node .claude/config/startup.js\n"
+    },
+    "when": "terminalFocus"
+  },
+  {
+    "key": "cmd+shift+l",
+    "command": "workbench.action.files.openFolder",
+    "args": ".claude"
+  },
+  {
+    "key": "cmd+shift+m",
+    "command": "workbench.action.files.open",
+    "args": ".claude/memory/QUICKREF.md"
+  }
+]
+```
+
+## 工作區推薦設置
+
+在 `.vscode/extensions.json` 中列出推薦的擴展：
+
+```json
+{
+  "recommendations": [
+    "markdown-it.markdown-preview-enhanced",
+    "appalachian-aspen.markdown-preview-enhanced",
+    "redhat.vscode-json-rpc",
+    "usernamehw.errorlens",
+    "bierner.comment-tagged-templates"
+  ]
+}
+```
+
+## 啟動配置
+
+在 `.vscode/tasks.json` 中添加初始化任務：
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Claude Code Init",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        ".claude/config/startup.js"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    }
+  ]
+}
+```
+
+## 啟動時自動運行
+
+要讓 VS Code 在打開工作區時自動運行初始化，編輯 `.vscode/tasks.json` 並設置 `runOn` 為 `folderOpen`。
+
+## 調試設置
+
+如果需要調試初始化腳本，在 `.vscode/launch.json` 中添加：
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Claude Init",
+      "program": "${workspaceFolder}/.claude/config/startup.js",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
+```
+
+然後按 F5 開始調試。
+
+---
+
+**提示**: 這些設置是可選的。系統也可以完全使用提示詞手動操作。

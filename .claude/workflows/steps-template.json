@@ -1,0 +1,98 @@
+{
+  "workflow_name": "workflow-template",
+  "description": "Standard workflow step configuration template",
+  "version": "1.0.0",
+  "total_steps": 3,
+  "estimated_total_time_minutes": 60,
+  "prerequisites": [
+    "Environment setup complete",
+    "Required files prepared",
+    "Related skills learned"
+  ],
+  "steps": [
+    {
+      "id": 1,
+      "name": "Preparation Phase",
+      "description": "What should be done in this step",
+      "sequence": 1,
+      "estimated_time_minutes": 20,
+      "required_skills": [
+        "skill-name"
+      ],
+      "required_files": [
+        ".claude/memory/learned-skills.md",
+        "other-relevant-file.md"
+      ],
+      "input_files": [],
+      "output_files": [],
+      "commands": [
+        "command-1 args",
+        "command-2 args"
+      ],
+      "success_criteria": [
+        "Criterion 1 met",
+        "Criterion 2 met"
+      ],
+      "rollback_steps": [
+        "Rollback action 1",
+        "Rollback action 2"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Execution Phase",
+      "description": "What should be done in this step",
+      "sequence": 2,
+      "estimated_time_minutes": 20,
+      "required_skills": [
+        "skill-name"
+      ],
+      "required_files": [
+        "relevant-file.md"
+      ],
+      "input_files": [],
+      "output_files": [],
+      "commands": [
+        "command-1 args"
+      ],
+      "success_criteria": [
+        "Criterion 1 met",
+        "Criterion 2 met"
+      ],
+      "rollback_steps": []
+    },
+    {
+      "id": 3,
+      "name": "Validation Phase",
+      "description": "What should be done in this step",
+      "sequence": 3,
+      "estimated_time_minutes": 20,
+      "required_skills": [],
+      "required_files": [],
+      "input_files": [],
+      "output_files": [],
+      "commands": [
+        "validation-command args"
+      ],
+      "success_criteria": [
+        "All outputs generated",
+        "All validations passed"
+      ],
+      "rollback_steps": []
+    }
+  ],
+  "completion_criteria": [
+    "All steps completed successfully",
+    "All success criteria met",
+    "All outputs generated"
+  ],
+  "failure_handling": {
+    "on_step_failure": "Stop and report error",
+    "recovery_strategy": "Use rollback steps or contact support"
+  },
+  "memory_updates": {
+    "update_active_workflow_state": true,
+    "update_workflow_history": true,
+    "update_discoveries": "if new solutions found"
+  }
+}
