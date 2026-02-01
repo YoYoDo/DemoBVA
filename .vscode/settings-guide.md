@@ -27,10 +27,26 @@
   "claude.workflows.showProgress": true,
   "claude.workflows.autoSave": true,
 
+  // 命令系統設置
+  "claude.commands.enabled": true,
+  "claude.commands.path": ".claude/commands",
+  "claude.commands.autoload": true,
+  "claude.commands.preload": true,
+  "claude.commands.scanPath": ".claude/commands",
+
+  // 規範系統設置
+  "claude.specify.enabled": true,
+  "claude.specify.path": ".specify",
+  "claude.specify.autoload": true,
+  "claude.specify.preload": true,
+  "claude.specify.scanPath": ".specify",
+
   // 初始化設置
   "claude.startup.autoInit": true,
   "claude.startup.scanSkills": true,
   "claude.startup.loadWorkflows": true,
+  "claude.startup.loadCommands": true,
+  "claude.startup.loadSpecify": true,
   "claude.startup.restoreContext": true,
   "claude.startup.checkTasks": true,
   "claude.startup.verbose": false,

@@ -12,25 +12,25 @@
 
 ## 📊 系統架構與角色分工
 
-### **系統三角形**
+### **系統架構圖**
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                                                      │
-│      CLAUDE.md (本文件)                              │
-│      統一管理中樞 & 系統協調                          │
-│                                                      │
-│  • 定義所有系統的角色和差異化                         │
-│  • 指明進入點和導航路線                              │
-│  • 管理系統間的交互和同步                            │
-│                                                      │
-└─────────────┬───────────────────────────────────┬────┘
-              │                                   │
-       ┌──────▼────────┐              ┌─────────▼────────┐
-       │ .claude/      │              │ .agents/         │
-       │ 記憶+工作流    │              │ 通用代理        │
-       │ 系統          │              │ 系統             │
-       └───────────────┘              └──────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│      CLAUDE.md (本文件)                                       │
+│      統一管理中樞 & 系統協調                                    │
+│                                                              │
+│  • 定義所有系統的角色和差異化                                    │
+│  • 指明進入點和導航路線                                         │
+│  • 管理系統間的交互和同步                                        │
+│                                                              │
+└───────┬──────────────┬──────────────┬──────────────┬─────────┘
+        │              │              │              │
+ ┌──────▼──────┐ ┌─────▼─────┐ ┌──────▼──────┐ ┌─────▼─────┐
+ │ .claude/    │ │ .gemini/  │ │ .agent/     │ │ .agents/  │
+ │ Claude Code │ │ Gemini    │ │ Antigravity │ │ 通用代理   │
+ │ 專用系統     │ │ 專用命令   │ │ 專用工作流   │ │ 系統      │
+ └─────────────┘ └───────────┘ └─────────────┘ └───────────┘
 ```
 
 ---
@@ -39,11 +39,13 @@
 
 ### **1. .claude/ 系統** 👈 您剛建立的
 
-**定位**: Claude Code 專用記憶和工作流系統
+**定位**: Claude Code 專用記憶、工作流、命令和規範系統
 
 **核心功能**:
 - 記憶系統（8 個檔案）- 持久化知識和進度
 - 工作流系統 - 預定義、可追蹤的工作流程
+- 命令系統（.claude/commands/）- 預加載的 speckit 命令
+- 規範系統（.specify/）- 項目規範和規格定義
 - 技能索引 - 自動掃描和管理技能
 - 自動化初始化 - 秒級恢復工作狀態
 
@@ -58,6 +60,8 @@ VS Code: 配置任務自動運行
 - 快速開始: `.claude/START_HERE.md`
 - 完整指南: `.claude/config/PROMPTS.md`
 - 索引: `.claude/README.md`
+- 命令列表: `.claude/commands/` (10+ speckit 命令)
+- 規範指南: `.specify/` (項目規範和模板)
 
 **特性**:
 - ✅ Claude Code 專屬
@@ -65,6 +69,8 @@ VS Code: 配置任務自動運行
 - ✅ 工作流進度追蹤
 - ✅ 記憶自動持久化
 - ✅ 環境變數驅動
+- ✅ 預加載命令系統（10+ speckit 命令）
+- ✅ 規範和規格管理
 
 ---
 
@@ -94,7 +100,47 @@ VS Code: 配置任務自動運行
 
 ---
 
-### **3. 潛在的 GEMINI.md 與 AGENTS.md**
+### **3. .gemini/ 系統** 🌟
+
+**定位**: Google Gemini 專用命令系統
+
+**核心功能**:
+- Gemini 格式命令（TOML 格式）
+- 與 `.claude/commands/` 功能對等
+- 10 個 speckit 命令完整支援
+
+**文檔位置**:
+- 命令: `.gemini/commands/` (10 個 speckit 命令)
+
+**特性**:
+- ✅ Gemini 專用
+- ✅ TOML 格式
+- ✅ 與 Claude 命令功能對等
+- ✅ 完整的 speckit 工作流
+
+---
+
+### **4. .agent/ 系統** 🚀
+
+**定位**: Antigravity 專用工作流系統
+
+**核心功能**:
+- Antigravity 格式工作流
+- 中文版命令定義
+- 與 `.claude/commands/` 功能對等
+
+**文檔位置**:
+- 工作流: `.agent/workflows/` (11 個工作流)
+
+**特性**:
+- ✅ Antigravity 專用
+- ✅ 中文指令
+- ✅ Markdown 格式
+- ✅ 包含 load_context 工作流
+
+---
+
+### **5. 潛在的 GEMINI.md 與 AGENTS.md**
 
 **如果存在的目的**:
 
@@ -114,16 +160,14 @@ VS Code: 配置任務自動運行
 
 ### **快速對比表**
 
-| 特性 | .claude/ | .agents/ | CLAUDE.md |
-|-----|---------|---------|-----------|
-| **用途** | Claude Code 記憶+工作流 | 通用代理系統 | 系統協調中樞 |
-| **智能化** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **自動化** | ✅ 完全自動 | ⚠️ 手動 | ✅ 自動協調 |
-| **初始化** | `startup.js` | `/load_context` | （指導） |
-| **工作流** | ✅ 有追蹤 | ❌ 無 | ✅ 統一管理 |
-| **記憶系統** | ✅ 8 個檔案 | ✅ 簡單 | ✅ 統一視圖 |
-| **AI 無關** | ❌ Claude 專用 | ✅ 通用 | ✅ 通用 |
-| **進度追蹤** | ✅ 實時 | ❌ 無 | ✅ 聚合視圖 |
+| 特性 | .claude/ | .gemini/ | .agent/ | .agents/ |
+|-----|---------|----------|---------|----------|
+| **用途** | Claude Code 專用 | Gemini 專用 | Antigravity 專用 | 通用代理 |
+| **格式** | Markdown | TOML | Markdown (中文) | Markdown |
+| **命令數** | 10 speckit | 11 (含 load_context) | 11 workflows | 2 skills |
+| **記憶系統** | ✅ 8 個檔案 | ✅ 共享記憶 | ✅ 共享記憶 | ✅ 共享 |
+| **自動化** | ✅ 完全自動 | ✅ load_context | ⚠️ load_context | ⚠️ 手動 |
+| **狀態** | ✅ 主要使用 | ✅ 完整 | ✅ 保留 | ⚠️ 輔助 |
 
 ---
 
@@ -176,18 +220,26 @@ VS Code: 配置任務自動運行
 ├── CLAUDE.md              ← 統一管理檔（本文件）
 ├── .claude/               ← Claude Code 專用系統
 │   ├── README.md
-│   ├── GETTING_STARTED.md
 │   ├── config/
-│   ├── workflows/
+│   ├── workflows/         ← 工作流定義
+│   ├── commands/          ← 預加載命令（10 speckit）
 │   ├── skills/
-│   └── memory/
-├── .agents/               ← 通用代理系統
+│   └── memory/            ← 8 個記憶檔案
+├── .gemini/               ← Gemini 專用系統
+│   └── commands/          ← TOML 格式命令（10 speckit）
+├── .agent/                ← Antigravity 專用系統
+│   └── workflows/         ← 中文工作流（11 個）
+├── .specify/              ← 項目規範和規格（共享）
+│   ├── memory/            ← 規範知識庫
+│   ├── scripts/           ← 規範腳本
+│   └── templates/         ← 規範模板
+├── .agents/               ← 通用代理系統（共享）
 │   ├── README.md
 │   ├── skills/
 │   └── memory/
-├── .env                   ← Claude 環境配置
+├── .env                   ← 統一環境配置（唯一配置來源）
 └── .vscode/
-    └── settings.json
+    └── settings-guide.md  ← VS Code 配置說明（非實際配置）
 ```
 
 **優點**:
@@ -196,19 +248,19 @@ VS Code: 配置任務自動運行
 - ✅ 易於維護：各系統獨立但關聯
 - ✅ 最優實踐：經過驗證的設計
 
-### **方案 2: 如果需要擴展**
+### **方案 2: 已實現的多工具架構** ✅
 
-如果未來需要支持多個 AI 工具，可擴展為：
+目前已支持多個 AI 工具：
 
 ```
 工作區根目錄
-├── CLAUDE.md          ← Claude Code 系統
-├── GEMINI.md          ← Google Gemini 系統（如需）
-├── AGENTS.md          ← 代理系統說明（如需）
-├── .claude/           ← Claude 專用
-├── .gemini/           ← Gemini 專用（如需）
-├── .agents/           ← 通用代理
-└── .tools/            ← 通用工具庫（如需）
+├── CLAUDE.md          ← Claude Code 系統（本文件）
+├── .claude/           ← Claude 專用（Markdown 命令）
+├── .gemini/           ← Gemini 專用（TOML 命令）✅ 已實現
+├── .agent/            ← Antigravity 專用（中文工作流）✅ 已實現
+├── .agents/           ← 通用代理（共享記憶）
+├── .specify/          ← 共享規範和模板
+└── .env               ← 統一配置來源
 ```
 
 ---
@@ -231,8 +283,16 @@ VS Code: 配置任務自動運行
   │  或命令: node .claude/...  │
   └─────────────┬───────────────┘
                 ▼
+  自動預加載系統組件
+  ├─ .claude/skills/ (所有技能)
+  ├─ .claude/workflows/ (所有工作流)
+  ├─ .claude/commands/ (10+ speckit 命令)
+  ├─ .specify/ (項目規範和規格)
+  └─ .claude/memory/ (8 個記憶檔案)
+                ▼
   Claude Code 準備完全上下文
   ├─ 已加載所有技能
+  ├─ 已加載所有命令和規範
   ├─ 已恢復工作狀態
   ├─ 已顯示待辦任務
   └─ 已加載發現和洞見
@@ -279,22 +339,28 @@ Claude Code 初始化
       ↓
   掃描 .claude/workflows/
       ↓
+  預加載 .claude/commands/ (10+ speckit 命令)
+      ↓
+  預加載 .specify/ (項目規範和規格)
+      ↓
   加載 .claude/memory/ (8 個檔案)
       ↓
   恢復完整上下文
       ↓
   可選: 加載 .agents/memory/ (/load_context)
       ↓
-  準備就緒！
+  準備就緒！ 所有命令和規範已可用
 ```
 
-### **記憶系統協調**
+### **記憶和資源系統協調**
 
-| 層級 | 位置 | 用途 | 更新頻率 |
-|-----|------|------|---------|
-| **L1** | `.claude/memory/` | Claude 專用記憶 | 實時 |
-| **L2** | `.agents/memory/` | 通用記憶 | 手動 |
-| **L3** | 工作流輸出 | 任務產物 | 任務完成時 |
+| 層級 | 位置 | 用途 | 更新頻率 | 預加載 |
+|-----|------|------|---------|--------|
+| **L1** | `.claude/memory/` | Claude 專用記憶 | 實時 | ✅ 自動 |
+| **L2** | `.agents/memory/` | 通用記憶 | 手動 | ⚠️ 可選 |
+| **L3** | `.claude/commands/` | 預定義命令（speckit） | 開發時 | ✅ 自動 |
+| **L4** | `.specify/` | 項目規範和規格 | 開發時 | ✅ 自動 |
+| **L5** | 工作流輸出 | 任務產物 | 任務完成時 | ✅ 自動 |
 
 ---
 
@@ -304,11 +370,15 @@ Claude Code 初始化
 
 ```
 ✅ 將 Claude 專用的東西放在 .claude/
+✅ 將預定義命令放在 .claude/commands/
+✅ 將項目規範放在 .specify/
 ✅ 將通用的東西放在 .agents/
 ✅ 用 CLAUDE.md 協調和導航
 ✅ 定期更新記憶檔案
 ✅ 在工作流中記錄決策
 ✅ 使用提示詞執行標準操作
+✅ 定期更新命令和規範
+✅ 在命令和規範中記錄最佳實踐
 ```
 
 ### **Don't ❌**
@@ -320,6 +390,9 @@ Claude Code 初始化
 ❌ 不要忽略更新記憶檔案
 ❌ 不要跳過初始化步驟
 ❌ 不要為每個 AI 工具建立獨立系統
+❌ 不要在 .specify/ 之外放置規範文件
+❌ 不要在 .claude/commands/ 之外放置 speckit 命令
+❌ 不要直接修改 .env 和 .vscode/settings.json 的路徑配置
 ```
 
 ---
@@ -328,13 +401,15 @@ Claude Code 初始化
 
 ### **當前狀態**
 
-| 系統 | 成熟度 | 文檔 | 自動化 | 推薦 |
-|-----|--------|------|--------|------|
-| .claude/ | ⭐⭐⭐⭐⭐ | 完整 | 100% | ✅ 立即使用 |
-| .agents/ | ⭐⭐⭐ | 基礎 | 手動 | ✅ 可使用 |
-| CLAUDE.md | ⭐⭐⭐⭐⭐ | 完整 | 100% | ✅ 立即使用 |
-| GEMINI.md | ⭐ | 無 | 0% | ⚠️ 如需再建 |
-| AGENTS.md | ⭐⭐ | 基礎 | 0% | ⚠️ 如需再建 |
+| 系統 | 成熟度 | 文檔 | 命令數 | 狀態 | 推薦 |
+|-----|--------|------|--------|------|------|
+| .claude/ | ⭐⭐⭐⭐⭐ | 完整 | 10 | ✅ 主要 | ✅ Claude Code |
+| .gemini/ | ⭐⭐⭐⭐⭐ | 完整 | 11 | ✅ 完整 | ✅ Gemini |
+| .agent/ | ⭐⭐⭐⭐ | 完整 | 11 | ✅ 保留 | ✅ Antigravity |
+| .specify/ | ⭐⭐⭐⭐⭐ | 完整 | - | ✅ 共享 | ✅ 所有工具 |
+| .agents/ | ⭐⭐⭐ | 基礎 | 2 | ⚠️ 輔助 | ⚠️ 可選 |
+| .env | ⭐⭐⭐⭐⭐ | 完整 | - | ✅ 唯一配置 | ✅ 必需 |
+| CLAUDE.md | ⭐⭐⭐⭐⭐ | 完整 | - | ✅ 中樞 | ✅ 必讀 |
 
 ---
 
@@ -343,32 +418,40 @@ Claude Code 初始化
 ### **第 1 步: 立即實施**
 
 ```bash
-# ✅ 使用 Claude 系統
+# ✅ 使用 Claude 系統（包含命令和規範預加載）
 node .claude/config/startup.js
 
 # 或在 Claude Code 中
 [系統初始化]
 ```
 
-### **第 2 步: 可選擴展**
+自動預加載包括：
+- ✅ .claude/skills/ (所有技能)
+- ✅ .claude/workflows/ (所有工作流)
+- ✅ .claude/commands/ (10+ speckit 命令) ⭐ NEW
+- ✅ .specify/ (項目規範和規格) ⭐ NEW
+- ✅ .claude/memory/ (8 個記憶檔案)
 
-```bash
-# 如需使用代理系統
-# 執行命令: /load_context
-```
+配置文件：
 
-### **第 3 步: 如需 Gemini/Agents**
+- ✅ `.env` - 統一配置來源（唯一）
+- ✅ `.vscode/settings-guide.md` - 配置說明文檔（非實際配置）
 
-```
-若未來需要支持 Gemini:
-  1. 新建 GEMINI.md
-  2. 新建 .gemini/ 目錄
-  3. 在 CLAUDE.md 中更新導航
+### **第 2 步: 選擇對應工具**
 
-若需要專用 AGENTS.md:
-  1. 新建 AGENTS.md 作為代理系統說明
-  2. 指向 .agents/ 的詳細說明
-```
+| 使用工具 | 命令位置 | 格式 |
+|---------|---------|------|
+| Claude Code | `.claude/commands/` | Markdown |
+| Gemini | `.gemini/commands/` | TOML |
+| Antigravity | `.agent/workflows/` | Markdown (中文) |
+
+### **第 3 步: 共享資源**
+
+所有工具共享以下資源：
+
+- `.specify/` - 規範模板和腳本
+- `.agents/memory/` - 通用記憶（可選）
+- `.env` - 環境配置
 
 ---
 
@@ -422,8 +505,8 @@ CLAUDE.md ← 統一規範
 **Q: 我應該使用 .claude/ 還是 .agents/?**
 A: 如果在 Claude Code 中工作，使用 .claude/。如果需要通用系統，用 .agents/。
 
-**Q: 何時需要建立 GEMINI.md?**
-A: 當你開始使用 Google Gemini 時。
+**Q: .gemini/ 和 .agent/ 目錄是什麼？**
+A: `.gemini/` 是 Gemini 專用命令（TOML 格式），`.agent/` 是 Antigravity 專用工作流（中文）。
 
 **Q: 可以同時使用兩個系統嗎？**
 A: 完全可以！.claude/ 和 .agents/ 是互補的，不衝突。
@@ -472,8 +555,12 @@ A: 不需要同步！各系統獨立但組織化。Claude 用 .claude/memory/，
 ### **記住**
 
 ```
-.claude/ = 智能化、自動化、Claude 專用
-.agents/ = 簡單、通用、手動控制
+.claude/  = Claude Code 專用（Markdown 命令）
+.gemini/  = Gemini 專用（TOML 命令）
+.agent/   = Antigravity 專用（中文工作流）
+.agents/  = 通用代理系統（共享記憶）
+.specify/ = 項目規範（共享模板和腳本）
+.env      = 統一配置（唯一來源）
 CLAUDE.md = 總指揮、協調中樞、架構藍圖
 ```
 

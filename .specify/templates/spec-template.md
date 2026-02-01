@@ -5,6 +5,54 @@
 **Status**: Draft  
 **Input**: User description: "$ARGUMENTS"
 
+## Interview Record *(mandatory)*
+
+<!--
+  CONSTITUTION REQUIREMENT (Principle 9: Interview-First Policy):
+  This section MUST be completed BEFORE writing any other sections.
+  The interview ensures the developer/AI fully understands business context.
+-->
+
+### Interview Date: [DATE]
+
+### Q1. Business Objectives
+
+**Q**: What are the main business goals of this module? What outcomes are expected?
+
+**A**: [Record the stakeholder's answer here]
+
+### Q2. User Roles & Needs
+
+**Q**: Who are the primary users? What are their key needs and pain points?
+
+**A**: [Record the stakeholder's answer here]
+
+### Q3. Integration & Dependencies
+
+**Q**: Which existing modules or external systems need to integrate with this? What data exchange is required?
+
+**A**: [Record the stakeholder's answer here]
+
+### Q4. Business Rules & Constraints
+
+**Q**: What key business rules or constraints apply? Are there regulatory/compliance requirements?
+
+**A**: [Record the stakeholder's answer here]
+
+### Q5. Priority & Scope
+
+**Q**: How are features prioritized? Are there phased delivery expectations? What is explicitly out of scope?
+
+**A**: [Record the stakeholder's answer here]
+
+### Understanding Confirmation
+
+**Summary of Understanding**: [Summarize key points from the interview]
+
+**Confirmed by stakeholder**: [ ] Yes / [ ] No (If No, revise understanding)
+
+---
+
 ## User Scenarios & Testing *(mandatory)*
 
 <!--

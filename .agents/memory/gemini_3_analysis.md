@@ -38,7 +38,7 @@ Gemini 3 is Google's latest AI model series, split into **Pro** (high capabiliti
   - extracting data from videos/audio.
 - **Effect**: "Pro-level intelligence" at much faster speeds and lower cost.
 
-## Conclusion for SEO Skills Project
+## Conclusion for SpecSkills Project
 
-- Use **Pro (High)** for: Designing workflows, analyzing complex SEO strategies, writing high-quality content specs.
-- Use **Flash** for: Processing large sets of keywords, summarizing competitor articles, quick Q&A.
+- Use **Pro (High)** for: Designing workflows, complex planning, writing detailed specifications.
+- Use **Flash** for: Quick Q&A, summarizing documents, routine tasks.
