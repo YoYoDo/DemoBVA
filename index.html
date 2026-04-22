@@ -20,6 +20,9 @@
     
     <!-- SheetJS -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Shared Calculation Core -->
+    <script src="./src/payout-core.js"></script>
 
     <style>
         @media print {
@@ -40,13 +43,10 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
         // --- Constants ---
-        const FACTOR_A = 0.042;
-        const FACTOR_B = 0.036;
-        const STORAGE_KEY = 'payout_calculator_data_v1';
-        
+        const { FACTOR_A, FACTOR_B, calculatePayout } = PayoutCore;
         const PREMIUM_OPTIONS = [300000, 500000, 1000000, 2000000, 3000000, 5000000, 10000000];
         const FEE_OPTIONS = [0.03, 0.028, 0.027];
 
@@ -65,38 +65,6 @@
                 minimumFractionDigits: decimals,
                 maximumFractionDigits: decimals,
             }).format(value);
-        };
-
-        // Core Logic (Mirrors payout.test.js)
-        const calculatePayout = (premium, feeRate, nav, costExRate, currentExRate) => {
-            // 1. Actual Units
-            const netPremiumTwd = premium * (1 - feeRate);
-            const costPerUnitTwd = nav * costExRate;
-            // Avoid division by zero
-            const units = costPerUnitTwd > 0 ? netPremiumTwd / costPerUnitTwd : 0;
-
-            // 2. Dual Scenario Calculation
-            // Scenario A: NAV >= 9 (Factor 0.042)
-            const monthlyTwdA = units * FACTOR_A * currentExRate;
-            
-            // Scenario B: NAV < 9 (Factor 0.036)
-            const monthlyTwdB = units * FACTOR_B * currentExRate;
-
-            return { 
-                units, 
-                netPremiumTwd, 
-                costPerUnitTwd,
-                scenarioA: {
-                    monthlyTwd: monthlyTwdA,
-                    yearlyTwd: monthlyTwdA * 12,
-                    factor: FACTOR_A
-                },
-                scenarioB: {
-                    monthlyTwd: monthlyTwdB,
-                    yearlyTwd: monthlyTwdB * 12,
-                    factor: FACTOR_B
-                }
-            };
         };
 
         // --- Components ---
@@ -138,6 +106,8 @@
             const [currentExRate, setCurrentExRate] = useState(31.5);
             const [showDecimals, setShowDecimals] = useState(false);
             const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+            const [editingEntryId, setEditingEntryId] = useState(null);
+            const importInputRef = useRef(null);
             
             // Form State
             const [form, setForm] = useState({
@@ -148,25 +118,16 @@
                 nav: 10.0
             });
 
-            // Load Data from LocalStorage on Mount
-            useEffect(() => {
-                const savedData = localStorage.getItem(STORAGE_KEY);
-                if (savedData) {
-                    try {
-                        const parsed = JSON.parse(savedData);
-                        if (parsed.entries) setEntries(parsed.entries);
-                        if (parsed.currentExRate) setCurrentExRate(parsed.currentExRate);
-                    } catch (e) {
-                        console.error("Failed to load data", e);
-                    }
-                }
-            }, []);
-
-            // Save Data to LocalStorage on Change
-            useEffect(() => {
-                const dataToSave = { entries, currentExRate };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-            }, [entries, currentExRate]);
+            const resetForm = () => {
+                setForm({
+                    premium: 1000000,
+                    isCustomPremium: false,
+                    feeRate: 0.028,
+                    costExRate: 31.5,
+                    nav: 10.0
+                });
+                setEditingEntryId(null);
+            };
 
             // Refresh Icons when DOM updates
             useEffect(() => {
@@ -175,15 +136,26 @@
 
             // Calculations
             const calculatedEntries = useMemo(() => {
+                let cumulativeNetPremium = 0;
+                let cumulativeUnits = 0;
+
                 return entries.map(entry => {
                     const result = calculatePayout(
-                        entry.premium, 
-                        entry.feeRate, 
-                        entry.nav, 
-                        entry.costExRate, 
+                        entry.premium,
+                        entry.feeRate,
+                        entry.nav,
+                        entry.costExRate,
                         currentExRate
                     );
-                    return { ...entry, ...result };
+
+                    cumulativeNetPremium += result.netPremiumTwd;
+                    cumulativeUnits += result.units;
+
+                    return {
+                        ...entry,
+                        ...result,
+                        cumulativeAvgCost: cumulativeUnits > 0 ? cumulativeNetPremium / cumulativeUnits : 0
+                    };
                 });
             }, [entries, currentExRate]);
 
@@ -211,24 +183,53 @@
             // Handlers
             const handleAddEntry = (e) => {
                 e.preventDefault();
-                const newEntry = {
-                    id: Date.now(),
+                const payload = {
                     premium: Number(form.premium),
                     feeRate: Number(form.feeRate),
                     costExRate: Number(form.costExRate),
                     nav: Number(form.nav)
                 };
-                setEntries([...entries, newEntry]);
+
+                if (payload.premium <= 0 || payload.costExRate <= 0 || payload.nav <= 0) {
+                    alert('請確認保費、進場匯率、NAV 皆為大於 0 的數值。');
+                    return;
+                }
+
+                if (editingEntryId !== null) {
+                    setEntries(entries.map(entry => (
+                        entry.id === editingEntryId ? { ...entry, ...payload } : entry
+                    )));
+                    resetForm();
+                    return;
+                }
+
+                setEntries([...entries, { id: Date.now(), ...payload }]);
+                resetForm();
+            };
+
+            const handleEditEntry = (entry) => {
+                setForm({
+                    premium: entry.premium,
+                    isCustomPremium: !PREMIUM_OPTIONS.includes(entry.premium),
+                    feeRate: entry.feeRate,
+                    costExRate: entry.costExRate,
+                    nav: entry.nav
+                });
+                setEditingEntryId(entry.id);
+                setIsMobileMenuOpen(true);
             };
 
             const handleDeleteEntry = (id) => {
                 setEntries(entries.filter(e => e.id !== id));
+                if (editingEntryId === id) {
+                    resetForm();
+                }
             };
 
             const handleClearAll = () => {
                 if (confirm('確定要清除所有資料嗎？此動作無法復原。')) {
                     setEntries([]);
-                    localStorage.removeItem(STORAGE_KEY);
+                    resetForm();
                 }
             };
 
@@ -258,13 +259,80 @@
                     // Scenario B
                     "情境 B (NAV<9) 月撥回": Number(e.scenarioB.monthlyTwd.toFixed(0)),
                     "情境 B (NAV<9) 年撥回": Number(e.scenarioB.yearlyTwd.toFixed(0)),
-                    // Diff removed
+                    "累積平均單位成本 (TWD)": Number(e.cumulativeAvgCost.toFixed(2)),
                 }));
 
                 const ws = XLSX.utils.json_to_sheet(data);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "試算結果");
                 XLSX.writeFile(wb, "投資撥回試算表.xlsx");
+            };
+
+            const parseNumericValue = (value) => {
+                if (typeof value === 'number') return value;
+                if (typeof value !== 'string') return NaN;
+                const normalized = value.replace(/[,\s]/g, '').replace('%', '');
+                const parsed = Number(normalized);
+                return Number.isFinite(parsed) ? parsed : NaN;
+            };
+
+            const handleImportExcel = (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const sheet = workbook.Sheets[firstSheetName];
+                        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+                        const imported = rows.map((row, idx) => {
+                            const premiumRaw = row['目標保費 (TWD)'] ?? row['目標保費'] ?? row['premium'];
+                            const feeRateRaw = row['費用率'] ?? row['feeRate'];
+                            const costExRateRaw = row['進場匯率'] ?? row['costExRate'];
+                            const navRaw = row['淨值 (NAV)'] ?? row['淨值'] ?? row['NAV'] ?? row['nav'];
+
+                            const premium = parseNumericValue(premiumRaw);
+                            const feeRateParsed = parseNumericValue(feeRateRaw);
+                            const feeRate = typeof feeRateRaw === 'string' && feeRateRaw.includes('%')
+                                ? feeRateParsed / 100
+                                : feeRateParsed > 1 ? feeRateParsed / 100 : feeRateParsed;
+                            const costExRate = parseNumericValue(costExRateRaw);
+                            const nav = parseNumericValue(navRaw);
+
+                            return {
+                                id: Date.now() + idx,
+                                premium,
+                                feeRate,
+                                costExRate,
+                                nav
+                            };
+                        }).filter(entry => (
+                            Number.isFinite(entry.premium) && entry.premium > 0 &&
+                            Number.isFinite(entry.feeRate) && entry.feeRate >= 0 &&
+                            Number.isFinite(entry.costExRate) && entry.costExRate > 0 &&
+                            Number.isFinite(entry.nav) && entry.nav > 0
+                        ));
+
+                        if (imported.length === 0) {
+                            alert('匯入失敗：找不到可用資料列，請確認欄位格式。');
+                            return;
+                        }
+
+                        setEntries(imported);
+                        resetForm();
+                        alert(`匯入完成：共 ${imported.length} 筆資料`);
+                    } catch (error) {
+                        console.error('Import failed', error);
+                        alert('匯入失敗：檔案內容無法解析。');
+                    } finally {
+                        event.target.value = '';
+                    }
+                };
+                reader.readAsArrayBuffer(file);
             };
 
             const handleCopyTable = () => {
@@ -388,9 +456,19 @@
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition flex justify-center items-center gap-2"
                                     tabIndex="5"
                                 >
-                                    <Icon name="plus-circle" size={18} />
-                                    加入試算
+                                    <Icon name={editingEntryId === null ? "plus-circle" : "save"} size={18} />
+                                    {editingEntryId === null ? '加入試算' : '儲存編輯'}
                                 </button>
+                                {editingEntryId !== null && (
+                                    <button
+                                        type="button"
+                                        onClick={resetForm}
+                                        className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded-lg transition flex justify-center items-center gap-2"
+                                    >
+                                        <Icon name="x-circle" size={18} />
+                                        取消編輯
+                                    </button>
+                                )}
                             </form>
 
                             <div className="mt-8 pt-6 border-t border-gray-100 space-y-3">
@@ -401,6 +479,20 @@
                                     <Icon name="play-circle" size={16} />
                                     載入 Demo 數據
                                 </button>
+                                <button
+                                    onClick={() => importInputRef.current?.click()}
+                                    className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-2 px-4 rounded-lg transition text-sm flex items-center justify-center gap-2 border border-blue-200"
+                                >
+                                    <Icon name="file-up" size={16} />
+                                    匯入 Excel
+                                </button>
+                                <input
+                                    ref={importInputRef}
+                                    type="file"
+                                    accept=".xlsx,.xls"
+                                    className="hidden"
+                                    onChange={handleImportExcel}
+                                />
                                 <button 
                                     onClick={handleClearAll}
                                     className="w-full border border-red-200 text-red-600 hover:bg-red-50 py-2 px-4 rounded-lg transition text-sm flex items-center justify-center gap-2"
@@ -483,7 +575,7 @@
                                     colorClass="bg-green-100" 
                                 />
                                 <SummaryCard 
-                                    title="預估年撥回 (A)" 
+                                    title="預估總撥回 (年)" 
                                     value={formatCurrency(summary.totalYearlyA)} 
                                     subValue={`情境 B: ${formatCurrency(summary.totalYearlyB)}`}
                                     icon="calendar-check" 
@@ -515,13 +607,16 @@
                                                 <th className="p-4 font-semibold text-right">實際單位數</th>
                                                 <th className="p-4 font-semibold text-right bg-green-50">情境 A (NAV≥9)<br/><span className="text-xs font-normal">月撥回 (TWD)</span></th>
                                                 <th className="p-4 font-semibold text-right bg-yellow-50">情境 B (8≤NAV&lt;9)<br/><span className="text-xs font-normal">月撥回 (TWD)</span></th>
-                                                <th className="p-4 font-semibold text-center w-16 no-print">操作</th>
+                                                <th className="p-4 font-semibold text-right bg-green-50">情境 A (NAV≥9)<br/><span className="text-xs font-normal">年撥回 (TWD)</span></th>
+                                                <th className="p-4 font-semibold text-right bg-yellow-50">情境 B (8≤NAV&lt;9)<br/><span className="text-xs font-normal">年撥回 (TWD)</span></th>
+                                                <th className="p-4 font-semibold text-right">平均單位成本</th>
+                                                <th className="p-4 font-semibold text-center w-24 no-print">操作</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 text-sm">
                                             {calculatedEntries.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="7" className="p-8 text-center text-gray-400">
+                                                    <td colSpan="9" className="p-8 text-center text-gray-400">
                                                         尚無資料，請從左側新增或載入 Demo 數據
                                                     </td>
                                                 </tr>
@@ -535,7 +630,13 @@
                                                             <div className="flex items-center gap-2">
                                                                 <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">費 {(entry.feeRate * 100).toFixed(1)}%</span>
                                                                 <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">匯 {entry.costExRate}</span>
-                                                                <span className={`px-2 py-0.5 rounded text-xs ${entry.nav < 8 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                                                    entry.nav < 8
+                                                                        ? 'bg-blue-100 text-blue-700'
+                                                                        : entry.nav < 9
+                                                                            ? 'bg-yellow-100 text-yellow-700'
+                                                                            : 'bg-green-100 text-green-700'
+                                                                }`}>
                                                                     NAV {entry.nav}
                                                                 </span>
                                                             </div>
@@ -549,7 +650,23 @@
                                                         <td className="p-4 text-right font-mono text-yellow-700 bg-yellow-50">
                                                             {formatCurrency(entry.scenarioB.monthlyTwd, 'TWD', showDecimals ? 2 : 0)}
                                                         </td>
+                                                        <td className="p-4 text-right font-mono text-green-700 bg-green-50">
+                                                            {formatCurrency(entry.scenarioA.yearlyTwd, 'TWD', showDecimals ? 2 : 0)}
+                                                        </td>
+                                                        <td className="p-4 text-right font-mono text-yellow-700 bg-yellow-50">
+                                                            {formatCurrency(entry.scenarioB.yearlyTwd, 'TWD', showDecimals ? 2 : 0)}
+                                                        </td>
+                                                        <td className="p-4 text-right font-mono">
+                                                            {formatCurrency(entry.cumulativeAvgCost, 'TWD', showDecimals ? 2 : 0)}
+                                                        </td>
                                                         <td className="p-4 text-center no-print">
+                                                            <button
+                                                                onClick={() => handleEditEntry(entry)}
+                                                                className="text-gray-400 hover:text-blue-500 transition p-1"
+                                                                title="編輯"
+                                                            >
+                                                                <Icon name="pencil" size={16} />
+                                                            </button>
                                                             <button 
                                                                 onClick={() => handleDeleteEntry(entry.id)}
                                                                 className="text-gray-400 hover:text-red-500 transition p-1"
