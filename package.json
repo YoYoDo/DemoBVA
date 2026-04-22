@@ -1,0 +1,12 @@
+{
+  "name": "investment-payout-calculator",
+  "version": "1.0.0",
+  "description": "Investment Payout Calculator SPA",
+  "main": "index.html",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

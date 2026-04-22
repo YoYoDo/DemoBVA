@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投資撥回試算與比較系統</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .print-full-width { width: 100% !important; max-width: none !important; }
+            body { background-color: white; }
+            .sidebar { display: none; }
+            .main-content { margin-left: 0 !important; width: 100% !important; }
+        }
+        /* Custom Scrollbar for Sidebar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // --- Constants ---
+        const FACTOR_A = 0.042;
+        const FACTOR_B = 0.036;
+        const STORAGE_KEY = 'payout_calculator_data_v1';
+        
+        const PREMIUM_OPTIONS = [300000, 500000, 1000000, 2000000, 3000000, 5000000, 10000000];
+        const FEE_OPTIONS = [0.03, 0.028, 0.027];
+
+        // --- Helper Functions ---
+        const formatCurrency = (value, currency = 'TWD', decimals = 0) => {
+            return new Intl.NumberFormat('zh-TW', {
+                style: 'currency',
+                currency: currency,
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
+            }).format(value);
+        };
+
+        const formatNumber = (value, decimals = 0) => {
+            return new Intl.NumberFormat('zh-TW', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
+            }).format(value);
+        };
+
+        // Core Logic (Mirrors payout.test.js)
+        const calculatePayout = (premium, feeRate, nav, costExRate, currentExRate) => {
+            // 1. Actual Units
+            const netPremiumTwd = premium * (1 - feeRate);
+            const costPerUnitTwd = nav * costExRate;
+            // Avoid division by zero
+            const units = costPerUnitTwd > 0 ? netPremiumTwd / costPerUnitTwd : 0;
+
+            // 2. Dual Scenario Calculation
+            // Scenario A: NAV >= 9 (Factor 0.042)
+            const monthlyTwdA = units * FACTOR_A * currentExRate;
+            
+            // Scenario B: NAV < 9 (Factor 0.036)
+            const monthlyTwdB = units * FACTOR_B * currentExRate;
+
+            return { 
+                units, 
+                netPremiumTwd, 
+                costPerUnitTwd,
+                scenarioA: {
+                    monthlyTwd: monthlyTwdA,
+                    yearlyTwd: monthlyTwdA * 12,
+                    factor: FACTOR_A
+                },
+                scenarioB: {
+                    monthlyTwd: monthlyTwdB,
+                    yearlyTwd: monthlyTwdB * 12,
+                    factor: FACTOR_B
+                }
+            };
+        };
+
+        // --- Components ---
+
+        const Icon = ({ name, size = 16, className = "" }) => {
+            useEffect(() => {
+                lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} width={size} height={size} className={className}></i>;
+        };
+
+        const Tooltip = ({ text }) => (
+            <div className="group relative inline-block ml-1 align-middle">
+                <Icon name="info" size={14} className="text-gray-400 hover:text-blue-500 cursor-help" />
+                <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 text-center">
+                    {text}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                </div>
+            </div>
+        );
+
+        const SummaryCard = ({ title, value, subValue, icon, colorClass }) => (
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-start space-x-4">
+                <div className={`p-3 rounded-lg ${colorClass} bg-opacity-10 text-${colorClass.split('-')[1]}-600`}>
+                    <Icon name={icon} size={24} />
+                </div>
+                <div>
+                    <p className="text-sm text-gray-500 font-medium">{title}</p>
+                    <h3 className="text-xl font-bold text-gray-800 mt-1">{value}</h3>
+                    {subValue && <p className="text-xs text-gray-400 mt-1">{subValue}</p>}
+                </div>
+            </div>
+        );
+
+        // --- Main App Component ---
+        const App = () => {
+            // State
+            const [entries, setEntries] = useState([]);
+            const [currentExRate, setCurrentExRate] = useState(31.5);
+            const [showDecimals, setShowDecimals] = useState(false);
+            const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+            
+            // Form State
+            const [form, setForm] = useState({
+                premium: 1000000,
+                isCustomPremium: false,
+                feeRate: 0.028,
+                costExRate: 31.5,
+                nav: 10.0
+            });
+
+            // Load Data from LocalStorage on Mount
+            useEffect(() => {
+                const savedData = localStorage.getItem(STORAGE_KEY);
+                if (savedData) {
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        if (parsed.entries) setEntries(parsed.entries);
+                        if (parsed.currentExRate) setCurrentExRate(parsed.currentExRate);
+                    } catch (e) {
+                        console.error("Failed to load data", e);
+                    }
+                }
+            }, []);
+
+            // Save Data to LocalStorage on Change
+            useEffect(() => {
+                const dataToSave = { entries, currentExRate };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+            }, [entries, currentExRate]);
+
+            // Refresh Icons when DOM updates
+            useEffect(() => {
+                lucide.createIcons();
+            });
+
+            // Calculations
+            const calculatedEntries = useMemo(() => {
+                return entries.map(entry => {
+                    const result = calculatePayout(
+                        entry.premium, 
+                        entry.feeRate, 
+                        entry.nav, 
+                        entry.costExRate, 
+                        currentExRate
+                    );
+                    return { ...entry, ...result };
+                });
+            }, [entries, currentExRate]);
+
+            const summary = useMemo(() => {
+                const totalPremium = calculatedEntries.reduce((sum, e) => sum + e.premium, 0);
+                const totalUnits = calculatedEntries.reduce((sum, e) => sum + e.units, 0);
+                
+                // Summaries for Scenario A (Primary) and B
+                const totalMonthlyA = calculatedEntries.reduce((sum, e) => sum + e.scenarioA.monthlyTwd, 0);
+                const totalMonthlyB = calculatedEntries.reduce((sum, e) => sum + e.scenarioB.monthlyTwd, 0);
+                
+                const totalYearlyA = calculatedEntries.reduce((sum, e) => sum + e.scenarioA.yearlyTwd, 0);
+                const totalYearlyB = calculatedEntries.reduce((sum, e) => sum + e.scenarioB.yearlyTwd, 0);
+                
+                // Weighted Average Cost: Total Net Premium / Total Units (Simplified approximation for display)
+                const totalNetPremium = calculatedEntries.reduce((sum, e) => sum + e.netPremiumTwd, 0);
+                const avgCost = totalUnits > 0 ? totalNetPremium / totalUnits : 0;
+
+                return { 
+                    totalPremium, totalUnits, avgCost, 
+                    totalMonthlyA, totalMonthlyB, totalYearlyA, totalYearlyB 
+                };
+            }, [calculatedEntries]);
+
+            // Handlers
+            const handleAddEntry = (e) => {
+                e.preventDefault();
+                const newEntry = {
+                    id: Date.now(),
+                    premium: Number(form.premium),
+                    feeRate: Number(form.feeRate),
+                    costExRate: Number(form.costExRate),
+                    nav: Number(form.nav)
+                };
+                setEntries([...entries, newEntry]);
+            };
+
+            const handleDeleteEntry = (id) => {
+                setEntries(entries.filter(e => e.id !== id));
+            };
+
+            const handleClearAll = () => {
+                if (confirm('確定要清除所有資料嗎？此動作無法復原。')) {
+                    setEntries([]);
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            };
+
+            const handleLoadDemo = () => {
+                const demoData = [
+                    // Validation Case: Approx 3,179.365 units
+                    // Premium 317,937, Fee 0%, NAV 10, ExRate 10 -> 3,179.37 units
+                    { id: 1, premium: 317937, feeRate: 0.0, costExRate: 10.0, nav: 10.0 }, 
+                    { id: 2, premium: 1000000, feeRate: 0.03, costExRate: 31.5, nav: 10.0 },
+                    { id: 3, premium: 2000000, feeRate: 0.028, costExRate: 31.5, nav: 10.0 },
+                    { id: 4, premium: 3000000, feeRate: 0.027, costExRate: 31.5, nav: 10.0 },
+                ];
+                setEntries(demoData);
+            };
+
+            const handleExportExcel = () => {
+                const data = calculatedEntries.map((e, idx) => ({
+                    "No.": idx + 1,
+                    "目標保費 (TWD)": e.premium,
+                    "費用率": `${(e.feeRate * 100).toFixed(1)}%`,
+                    "進場匯率": e.costExRate,
+                    "淨值 (NAV)": e.nav,
+                    "單位數": Number(e.units.toFixed(2)),
+                    // Scenario A
+                    "情境 A (NAV≥9) 月撥回": Number(e.scenarioA.monthlyTwd.toFixed(0)),
+                    "情境 A (NAV≥9) 年撥回": Number(e.scenarioA.yearlyTwd.toFixed(0)),
+                    // Scenario B
+                    "情境 B (NAV<9) 月撥回": Number(e.scenarioB.monthlyTwd.toFixed(0)),
+                    "情境 B (NAV<9) 年撥回": Number(e.scenarioB.yearlyTwd.toFixed(0)),
+                    // Diff removed
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "試算結果");
+                XLSX.writeFile(wb, "投資撥回試算表.xlsx");
+            };
+
+            const handleCopyTable = () => {
+                const text = calculatedEntries.map(e => 
+                    `${formatCurrency(e.premium)} | Units: ${formatNumber(e.units)} | A: ${formatCurrency(e.scenarioA.monthlyTwd)} | B: ${formatCurrency(e.scenarioB.monthlyTwd)}`
+                ).join('\n');
+                navigator.clipboard.writeText(text).then(() => alert('表格摘要已複製到剪貼簿'));
+            };
+
+            return (
+                <div className="flex min-h-screen flex-col md:flex-row">
+                    {/* Sidebar - Hidden on mobile unless toggled */}
+                    <aside className={`w-full md:w-80 bg-white border-r border-gray-200 flex-shrink-0 flex-col h-auto md:h-screen sticky top-0 z-20 sidebar ${isMobileMenuOpen ? 'flex' : 'hidden md:flex'}`}>
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <Icon name="calculator" className="text-blue-600" />
+                                快速新增進場
+                            </h2>
+                            <button 
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="md:hidden text-gray-500 hover:text-gray-700"
+                            >
+                                <Icon name="x" size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+                            <form onSubmit={handleAddEntry} className="space-y-5">
+                                {/* Premium */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        目標保費 (TWD) <Tooltip text="預計投入的總金額" />
+                                    </label>
+                                    {!form.isCustomPremium ? (
+                                        <select 
+                                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                                            value={form.premium}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === 'custom') setForm({...form, isCustomPremium: true, premium: 0});
+                                                else setForm({...form, premium: Number(val)});
+                                            }}
+                                            tabIndex="1"
+                                        >
+                                            {PREMIUM_OPTIONS.map(opt => (
+                                                <option key={opt} value={opt}>{formatNumber(opt)}</option>
+                                            ))}
+                                            <option value="custom">自定義輸入...</option>
+                                        </select>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="number" 
+                                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                                value={form.premium}
+                                                onChange={(e) => setForm({...form, premium: Number(e.target.value)})}
+                                                placeholder="輸入金額"
+                                                autoFocus
+                                                tabIndex="1"
+                                            />
+                                            <button 
+                                                type="button"
+                                                onClick={() => setForm({...form, isCustomPremium: false, premium: 1000000})}
+                                                className="p-2 text-gray-500 hover:text-gray-700"
+                                            >
+                                                <Icon name="x" size={16} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Fee Rate */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        費用率 <Tooltip text="扣除的保費費用比例" />
+                                    </label>
+                                    <select 
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={form.feeRate}
+                                        onChange={(e) => setForm({...form, feeRate: Number(e.target.value)})}
+                                        tabIndex="2"
+                                    >
+                                        {FEE_OPTIONS.map(opt => (
+                                            <option key={opt} value={opt}>{(opt * 100).toFixed(1)}%</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Cost ExRate */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        進場匯率 (Cost ExRate) <Tooltip text="資金進場時的美元匯率，影響單位成本" />
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01"
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={form.costExRate}
+                                        onChange={(e) => setForm({...form, costExRate: Number(e.target.value)})}
+                                        tabIndex="3"
+                                    />
+                                </div>
+
+                                {/* NAV */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        淨值 (NAV) <Tooltip text="基金淨值，影響撥回因子與單位數" />
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        step="0.01"
+                                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={form.nav}
+                                        onChange={(e) => setForm({...form, nav: Number(e.target.value)})}
+                                        tabIndex="4"
+                                    />
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition flex justify-center items-center gap-2"
+                                    tabIndex="5"
+                                >
+                                    <Icon name="plus-circle" size={18} />
+                                    加入試算
+                                </button>
+                            </form>
+
+                            <div className="mt-8 pt-6 border-t border-gray-100 space-y-3">
+                                <button 
+                                    onClick={handleLoadDemo}
+                                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg transition text-sm flex items-center justify-center gap-2"
+                                >
+                                    <Icon name="play-circle" size={16} />
+                                    載入 Demo 數據
+                                </button>
+                                <button 
+                                    onClick={handleClearAll}
+                                    className="w-full border border-red-200 text-red-600 hover:bg-red-50 py-2 px-4 rounded-lg transition text-sm flex items-center justify-center gap-2"
+                                >
+                                    <Icon name="trash-2" size={16} />
+                                    清除全部
+                                </button>
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 bg-gray-50 min-h-screen flex flex-col main-content">
+                        {/* Sticky Header */}
+                        <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 no-print">
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <button 
+                                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                    className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                >
+                                    <Icon name="menu" />
+                                </button>
+                                <div>
+                                    <h1 className="text-xl font-bold text-gray-800">投資撥回試算與比較系統</h1>
+                                    <p className="text-xs text-gray-500 mt-1">⚠️ 試算結果僅供參考，實際金額以保險公司公告為準</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">
+                                    <label className="text-sm font-medium text-blue-800 whitespace-nowrap">
+                                        現時匯率 (Current ExRate):
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        step="0.1"
+                                        className="w-20 p-1 text-right bg-white border border-blue-200 rounded text-blue-900 font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={currentExRate}
+                                        onChange={(e) => setCurrentExRate(Number(e.target.value))}
+                                    />
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                    <button onClick={handleExportExcel} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="匯出 Excel">
+                                        <Icon name="download" />
+                                    </button>
+                                    <button onClick={() => window.print()} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="列印">
+                                        <Icon name="printer" />
+                                    </button>
+                                    <button onClick={handleCopyTable} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg" title="複製表格">
+                                        <Icon name="copy" />
+                                    </button>
+                                </div>
+                            </div>
+                        </header>
+
+                        {/* Dashboard Content */}
+                        <div className="p-6 space-y-6 flex-1">
+                            
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <SummaryCard 
+                                    title="總投入本金" 
+                                    value={formatCurrency(summary.totalPremium)} 
+                                    icon="wallet" 
+                                    colorClass="bg-blue-100" 
+                                />
+                                <SummaryCard 
+                                    title="總累積單位數" 
+                                    value={formatNumber(summary.totalUnits)} 
+                                    subValue={`平均成本: ${formatCurrency(summary.avgCost, 'TWD', 2)}/單位`}
+                                    icon="layers" 
+                                    colorClass="bg-purple-100" 
+                                />
+                                <SummaryCard 
+                                    title="預估總撥回 (月)" 
+                                    value={formatCurrency(summary.totalMonthlyA)} 
+                                    subValue={`情境 B: ${formatCurrency(summary.totalMonthlyB)}`}
+                                    icon="coins" 
+                                    colorClass="bg-green-100" 
+                                />
+                                <SummaryCard 
+                                    title="預估年撥回 (A)" 
+                                    value={formatCurrency(summary.totalYearlyA)} 
+                                    subValue={`情境 B: ${formatCurrency(summary.totalYearlyB)}`}
+                                    icon="calendar-check" 
+                                    colorClass="bg-orange-100" 
+                                />
+                            </div>
+
+                            {/* Table Controls */}
+                            <div className="flex justify-end items-center gap-2 text-sm text-gray-600">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={showDecimals} 
+                                        onChange={(e) => setShowDecimals(e.target.checked)}
+                                        className="rounded text-blue-600 focus:ring-blue-500"
+                                    />
+                                    顯示小數點後兩位
+                                </label>
+                            </div>
+
+                            {/* Data Table */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider border-b border-gray-200">
+                                                <th className="p-4 font-semibold">保費 (TWD)</th>
+                                                <th className="p-4 font-semibold">參數設定</th>
+                                                <th className="p-4 font-semibold text-right">實際單位數</th>
+                                                <th className="p-4 font-semibold text-right bg-green-50">情境 A (NAV≥9)<br/><span className="text-xs font-normal">月撥回 (TWD)</span></th>
+                                                <th className="p-4 font-semibold text-right bg-yellow-50">情境 B (8≤NAV&lt;9)<br/><span className="text-xs font-normal">月撥回 (TWD)</span></th>
+                                                <th className="p-4 font-semibold text-center w-16 no-print">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 text-sm">
+                                            {calculatedEntries.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="7" className="p-8 text-center text-gray-400">
+                                                        尚無資料，請從左側新增或載入 Demo 數據
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                calculatedEntries.map((entry) => (
+                                                    <tr key={entry.id} className="hover:bg-gray-50 transition">
+                                                        <td className="p-4 font-medium text-gray-900">
+                                                            {formatCurrency(entry.premium)}
+                                                        </td>
+                                                        <td className="p-4 text-gray-600 space-y-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">費 {(entry.feeRate * 100).toFixed(1)}%</span>
+                                                                <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">匯 {entry.costExRate}</span>
+                                                                <span className={`px-2 py-0.5 rounded text-xs ${entry.nav < 8 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                    NAV {entry.nav}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 text-right font-mono">
+                                                            {formatNumber(entry.units, showDecimals ? 2 : 0)}
+                                                        </td>
+                                                        <td className="p-4 text-right font-mono font-bold text-green-700 bg-green-50">
+                                                            {formatCurrency(entry.scenarioA.monthlyTwd, 'TWD', showDecimals ? 2 : 0)}
+                                                        </td>
+                                                        <td className="p-4 text-right font-mono text-yellow-700 bg-yellow-50">
+                                                            {formatCurrency(entry.scenarioB.monthlyTwd, 'TWD', showDecimals ? 2 : 0)}
+                                                        </td>
+                                                        <td className="p-4 text-center no-print">
+                                                            <button 
+                                                                onClick={() => handleDeleteEntry(entry.id)}
+                                                                className="text-gray-400 hover:text-red-500 transition p-1"
+                                                                title="刪除"
+                                                            >
+                                                                <Icon name="trash" size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer Documentation */}
+                        <footer className="bg-white border-t border-gray-200 p-6 text-sm text-gray-600 no-print">
+                            <div className="max-w-4xl mx-auto space-y-4">
+                                <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                                    <Icon name="book-open" size={16} />
+                                    計算公式說明
+                                </h4>
+                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 font-mono text-xs md:text-sm overflow-x-auto">
+                                    <p>實際單位數 = 目標保費 × (1 - 費用率) ÷ (淨值 × 進場匯率)</p>
+                                    <p className="mt-2">撥回金額 (TWD) = 實際單位數 × 撥回因子 × 現時匯率</p>
+                                    <ul className="mt-2 list-disc list-inside text-gray-500">
+                                        <li>情境 A (NAV ≥ 9): 因子 {FACTOR_A}</li>
+                                        <li>情境 B (NAV &lt; 9): 因子 {FACTOR_B}</li>
+                                    </ul>
+                                </div>
+                                
+                                {calculatedEntries.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h5 className="font-semibold text-gray-700">逐步示範 (以第一筆資料為例):</h5>
+                                        <div className="pl-4 border-l-2 border-blue-200 space-y-1 text-gray-500">
+                                            <p>1. 淨投入 = {formatCurrency(calculatedEntries[0].premium)} × (1 - {calculatedEntries[0].feeRate}) = {formatCurrency(calculatedEntries[0].netPremiumTwd)}</p>
+                                            <p>2. 單位成本 = {calculatedEntries[0].nav} (NAV) × {calculatedEntries[0].costExRate} (匯率) = {formatCurrency(calculatedEntries[0].costPerUnitTwd)}</p>
+                                            <p>3. 取得單位 = {formatNumber(calculatedEntries[0].netPremiumTwd, 0)} ÷ {formatNumber(calculatedEntries[0].costPerUnitTwd, 2)} ≈ {formatNumber(calculatedEntries[0].units, 2)}</p>
+                                            <p>4. 情境 A 月撥回 = {formatNumber(calculatedEntries[0].units, 2)} × {FACTOR_A} × {currentExRate} ≈ {formatCurrency(calculatedEntries[0].scenarioA.monthlyTwd)}</p>
+                                            <p>5. 情境 B 月撥回 = {formatNumber(calculatedEntries[0].units, 2)} × {FACTOR_B} × {currentExRate} ≈ {formatCurrency(calculatedEntries[0].scenarioB.monthlyTwd)}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </footer>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
